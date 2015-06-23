@@ -4,6 +4,7 @@ require 'graphite-api'
 require 'mongo'
 require 'pp'
 require 'active_support/time'
+require 'getoptlong'
 
 Mongo::Logger.logger.level = Logger::INFO
 
@@ -86,37 +87,64 @@ def to_dotted_flat_hash(h, parents = [])
   return ret
 end
 
-stamp_file = "stats.stamp"
-time_gap = 1.hour
 
-time_from = nil
-begin
-  time_from = Time.at(File.read(stamp_file).to_i)
-rescue
-  # ignore
+def usage
+  puts <<-EOS
+#{$0} [options]
+
+Options:
+ -h, --help              Show help
+ -v, --verbose           Verbose output (multiple for more)
+ -q, --quiet             Quiet output (multiple for more)
+ -b, --back-min=MINUTS   Gather stat from MINUTS ago (default: 1 hour)
+ -f, --from=TIME_STRING  Set gathering start point by time
+EOS
 end
-t = Time.now - time_gap
-time_to = Time.new(t.year, t.month, t.day, t.hour, t.min)
 
-if time_from == time_to
-  Mongo::Logger.logger.debug "Noting to do"
-  exit
+opts = GetoptLong.new(
+  [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
+  [ '--back-min', '-b', GetoptLong::REQUIRED_ARGUMENT ],
+  [ '--from', '-f', GetoptLong::REQUIRED_ARGUMENT ],
+  [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ],
+  [ '--quiet', '-q', GetoptLong::NO_ARGUMENT ]
+)
+
+time_from = Time.now - 1.hour
+
+opts.each do |opt, arg|
+    case opt
+    when '--help'
+      usage
+      exit
+    when '--verbose'
+      Mongo::Logger.logger.level -= 1
+    when '--quiet'
+      Mongo::Logger.logger.level += 1
+    when '--back-min'
+      arg.to_i == 0 and raise "Invalid value for back min: #{arg}"
+      time_from = Time.now - arg.to_i.minutes
+    when '--from'
+      time_from = Time.parse(arg)
+  end
 end
 
 gh = GraphiteAPI.new(graphite: 'localhost:2003')
 
 mdb = Mongo::Client.new('mongodb://localhost:27017/mozshot')
-mr_opts = {finalize: avg, query: {time: {'$lt' => time_to}}, sort: {time: 1}}
+mr_opts = {finalize: avg, query: {}, sort: {time: 1}}
 
 if time_from
+  mr_opts[:query][:time] ||= {}
   mr_opts[:query][:time]['$gte'] = time_from
 end
 
-Mongo::Logger.logger.debug "Gathering stats (#{time_from} - #{time_to})..."
+Mongo::Logger.logger.info "Gathering stats from #{time_from}..."
 
+count = 0
 mdb['access'].find.map_reduce(map, reduce, mr_opts).each do |stat|
+  count += 1
   time = stat.delete '_id'
   gh.metrics to_dotted_flat_hash(stat['value'], ['mozshot']), Time.at(time.to_i)
 end
 
-File.write stamp_file, time_to.to_i
+Mongo::Logger.logger.info "Done, #{count} data points has been inserted."
