@@ -9,7 +9,7 @@ function() {
   r.method[this.method] = 1;
   r.code[this.code.toString()] = 1;
   if (this.process_time)
-    r['process_tile'] = {_val: this.process_time}
+    r['process_time'] = {_val: this.process_time}
   if (this.remote_country) {
     r['country'] = {}
     r.country[this.remote_country] = 1;
