@@ -1,6 +1,8 @@
 #!/usr/bin/ruby
 
 require 'graphite-api'
+#require 'mongo'
+gem 'mongo', '2.0.5'
 require 'mongo'
 require 'pp'
 require 'active_support/time'
@@ -103,20 +105,39 @@ finalize = File.read(finalize_js)
 gh = GraphiteAPI.new(graphite: graphite_server)
 
 mdb = Mongo::Client.new(mongodb_url)
-mr_opts = {finalize: finalize, query: {}, sort: {time: 1}}
+mr_opts = {finalize: finalize, query: {time: {}}, sort: {time: 1}}
+mr_opts[:query][:time] ||= {}
 
 if time_from
-  mr_opts[:query][:time] ||= {}
   mr_opts[:query][:time]['$gte'] = time_from
+end
+
+first_item = mdb[mongodb_col].find.sort(time: 1).limit(1).first
+unless first_item
+  Mongo::Logger.logger.error "No access item found. exit."
+  exit
+end
+
+if time_from < first_item['time']
+  d = first_item['time']
+  time_from = Time.new(d.year, d.month, d.day, d.hour, d.min, 0, d.utc_offset)
 end
 
 Mongo::Logger.logger.info "Gathering stats from #{time_from}..."
 
 count = 0
-mdb[mongodb_col].find.map_reduce(map, reduce, mr_opts).each do |stat|
-  count += 1
-  time = stat.delete '_id'
-  gh.metrics to_dotted_flat_hash(stat['value'], graphite_prefix), Time.at(time.to_i)
+
+loop do
+  mr_opts[:query][:time]['$gte'] = time_from
+  time_from += 1.hour
+  mr_opts[:query][:time]['$lt'] = time_from
+  Mongo::Logger.logger.info "Gathering stats for slice: #{mr_opts[:query][:time]['$gte']} - #{mr_opts[:query][:time]['$lt']}"
+  mdb[mongodb_col].find.map_reduce(map, reduce, mr_opts).each do |stat|
+    count += 1
+    time = stat.delete '_id'
+    gh.metrics to_dotted_flat_hash(stat['value'], graphite_prefix), Time.at(time.to_i)
+  end
+  time_from > Time.now and break
 end
 
 Mongo::Logger.logger.info "Done, #{count} data points has been inserted."
