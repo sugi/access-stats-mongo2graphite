@@ -8,11 +8,15 @@ function() {
   var r = {count: 1, code: {}, method: {}, size: {_val: this.size}};
   r.method[this.method] = 1;
   r.code[this.code.toString()] = 1;
-  if (this.process_time)
+  if (typeof(this.process_time) !== 'undefined')
     r['process_time'] = {_val: this.process_time}
   if (this.remote_country) {
     r['country'] = {}
     r.country[this.remote_country] = 1;
+  }
+  if (this.proto) {
+    r['proto'] = {}
+    r.proto[this.proto] = 1;
   }
   if (this.webfront) {
     r['webfront'] = {}
