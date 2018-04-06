@@ -1,26 +1,26 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (4.2.1)
-      i18n (~> 0.7)
-      json (~> 1.7, >= 1.7.7)
+    activesupport (5.1.6)
+      concurrent-ruby (~> 1.0, >= 1.0.2)
+      i18n (>= 0.7, < 2)
       minitest (~> 5.1)
-      thread_safe (~> 0.3, >= 0.3.4)
       tzinfo (~> 1.1)
-    bson (3.1.0)
-    eventmachine (1.0.7)
-    graphite-api (0.1.6)
+    bson (4.3.0)
+    concurrent-ruby (1.0.5)
+    eventmachine (1.2.5)
+    graphite-api (0.3.1)
       eventmachine (>= 0.3.3)
-      zscheduler (>= 0.0.3)
-    i18n (0.7.0)
-    json (1.8.3)
-    minitest (5.7.0)
-    mongo (2.0.5)
-      bson (~> 3.0)
-    thread_safe (0.3.5)
-    tzinfo (1.2.2)
+      zscheduler (>= 0.0.7)
+    i18n (1.0.0)
+      concurrent-ruby (~> 1.0)
+    minitest (5.11.3)
+    mongo (2.5.1)
+      bson (>= 4.3.0, < 5.0.0)
+    thread_safe (0.3.6)
+    tzinfo (1.2.5)
       thread_safe (~> 0.1)
-    zscheduler (0.0.6)
+    zscheduler (0.0.8)
       eventmachine
 
 PLATFORMS
@@ -29,4 +29,7 @@ PLATFORMS
 DEPENDENCIES
   activesupport
   graphite-api
-  mongo (~> 2.0)
+  mongo (~> 2.2)
+
+BUNDLED WITH
+   1.16.1
