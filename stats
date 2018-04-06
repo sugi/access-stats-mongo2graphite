@@ -1,0 +1,5 @@
+#!/bin/bash
+
+export GEM_HOME=$HOME/lib/rubygems/2.5
+cd "$(dirname $0)"
+bundle exec ruby2.5 stats.rb "$@"
