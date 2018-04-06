@@ -1,8 +1,6 @@
 #!/usr/bin/ruby
 
 require 'graphite-api'
-#require 'mongo'
-gem 'mongo', '2.0.5'
 require 'mongo'
 require 'pp'
 require 'active_support/time'
@@ -104,12 +102,13 @@ finalize = File.read(finalize_js)
 
 gh = GraphiteAPI.new(graphite: graphite_server)
 
-mdb = Mongo::Client.new(mongodb_url)
-mr_opts = {finalize: finalize, query: {time: {}}, sort: {time: 1}}
-mr_opts[:query][:time] ||= {}
+mc = Mongo::Client.new(mongodb_url)
+mdb = mc.database
+mr_opts = {finalize: finalize}
+filter = {time: {}}
 
 if time_from
-  mr_opts[:query][:time]['$gte'] = time_from
+  filter[:time]['$gte'] = time_from
 end
 
 first_item = mdb[mongodb_col].find.sort(time: 1).limit(1).first
@@ -128,11 +127,11 @@ Mongo::Logger.logger.info "Gathering stats from #{time_from}..."
 count = 0
 
 loop do
-  mr_opts[:query][:time]['$gte'] = time_from
+  filter[:time]['$gte'] = time_from
   time_from += 1.hour
-  mr_opts[:query][:time]['$lt'] = time_from
-  Mongo::Logger.logger.info "Gathering stats for slice: #{mr_opts[:query][:time]['$gte']} - #{mr_opts[:query][:time]['$lt']}"
-  mdb[mongodb_col].find.map_reduce(map, reduce, mr_opts).each do |stat|
+  filter[:time]['$lt'] = time_from
+  Mongo::Logger.logger.info "Gathering stats for slice: #{filter[:time]['$gte']} - #{filter[:time]['$lt']}"
+  mdb[mongodb_col].find(filter, sort: {time: 1}).map_reduce(map, reduce, mr_opts).each do |stat|
     count += 1
     time = stat.delete '_id'
     gh.metrics to_dotted_flat_hash(stat['value'], graphite_prefix), Time.at(time.to_i)
