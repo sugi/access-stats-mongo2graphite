@@ -7,6 +7,7 @@ require 'active_support/time'
 require 'getoptlong'
 
 Mongo::Logger.logger.level = Logger::INFO
+#GraphiteAPI::Logger.init level: :debug, dev: STDOUT
 
 def to_dotted_flat_hash(h, parents = [])
   ret = {}
@@ -60,7 +61,7 @@ time_from = Time.now - 1.hour
 map_js = File.dirname(__FILE__)+'/map.js'
 reduce_js = File.dirname(__FILE__)+'/reduce.js'
 finalize_js = File.dirname(__FILE__)+'/finalize.js'
-graphite_server = 'localhost:2003'
+graphite_server = 'tcp://localhost:2003'
 graphite_prefix = []
 mongodb_url = 'mongodb://localhost:27017/test'
 mongodb_col = 'access'
@@ -134,7 +135,8 @@ loop do
   mdb[mongodb_col].find(filter, sort: {time: 1}).map_reduce(map, reduce, mr_opts).each do |stat|
     count += 1
     time = stat.delete '_id'
-    gh.metrics to_dotted_flat_hash(stat['value'], graphite_prefix), Time.at(time.to_i)
+    Mongo::Logger.logger.debug "Set metric value #{Time.at(time.to_i)} for #{stat['value']}"
+    gh.metrics(to_dotted_flat_hash(stat['value'], graphite_prefix), Time.at(time.to_i))
   end
   time_from > Time.now and break
 end
